@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+  <meta name="theme-color" content="#1a1a2e"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Activity"/>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="icon" href="icons/icon-192.png"/>
+  <link rel="apple-touch-icon" href="icons/icon-192.png"/>
+  <title>Activity Szoba</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:wght@400;600;700;900&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css"/>
+  <link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+
+<!-- ===== JÁTÉKOS NÉZET ===== -->
+<div id="player-view" class="view active">
+  <div class="stars" id="stars"></div>
+
+  <div class="player-inner">
+    <!-- Állapot: VÁRAKOZÁS -->
+    <div id="state-idle" class="state active">
+      <div class="logo-wrap">
+        <div class="logo-icon"><i class="ti ti-cards"></i></div>
+        <h1 class="logo-text">ACTIVITY</h1>
+        <p class="logo-sub">Szoba</p>
+      </div>
+      <button class="btn-giant pulse" id="btn-draw" onclick="App.drawCard()">
+        <i class="ti ti-hand-finger"></i>
+        <span>Feladványt húzok!</span>
+      </button>
+      <div class="category-pill" id="active-cat-pill">
+        <i class="ti ti-tag"></i>
+        <span id="active-cat-name">Nincs kategória</span>
+      </div>
+    </div>
+
+    <!-- Állapot: FELADVÁNY -->
+    <div id="state-card" class="state">
+      <div class="challenge-card" id="challenge-card">
+        <div class="challenge-mode" id="challenge-mode">
+          <i class="ti" id="mode-icon"></i>
+          <span id="mode-label"></span>
+        </div>
+        <div class="challenge-word" id="challenge-word">—</div>
+        <div class="challenge-desc" id="challenge-desc"></div>
+      </div>
+      <button class="btn-giant green" id="btn-start-timer" onclick="App.startTimer()">
+        <i class="ti ti-player-play"></i>
+        <span>Időzítő indítása!</span>
+      </button>
+      <button class="btn-secondary" onclick="App.reset()">
+        <i class="ti ti-refresh"></i> Vissza
+      </button>
+    </div>
+
+    <!-- Állapot: IDŐZÍTŐ -->
+    <div id="state-timer" class="state">
+      <div class="timer-wrap">
+        <svg class="timer-svg" viewBox="0 0 220 220">
+          <circle class="timer-bg" cx="110" cy="110" r="96"/>
+          <circle class="timer-arc" id="timer-arc" cx="110" cy="110" r="96"/>
+        </svg>
+        <div class="timer-inner">
+          <div class="timer-num" id="timer-num">60</div>
+          <div class="timer-unit">másodperc</div>
+        </div>
+      </div>
+      <div class="timer-word-recap" id="timer-recap"></div>
+      <button class="btn-giant red" id="btn-done" onclick="App.reset()" style="display:none;">
+        <i class="ti ti-flag"></i>
+        <span>Kész!</span>
+      </button>
+    </div>
+
+    <!-- Állapot: LEJÁRT -->
+    <div id="state-timeout" class="state">
+      <div class="timeout-icon"><i class="ti ti-hourglass-empty"></i></div>
+      <div class="timeout-text">Lejárt az idő!</div>
+      <button class="btn-giant" onclick="App.reset()">
+        <i class="ti ti-refresh"></i>
+        <span>Új feladvány</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- GM belépési pont (rejtett sarok) -->
+  <button class="gm-corner" id="gm-corner-btn" onclick="UI.showGMLogin()" title="Játékmester">
+    <i class="ti ti-settings"></i>
+  </button>
+</div>
+
+<!-- ===== GM BEJELENTKEZÉS ===== -->
+<div id="gm-login" class="view overlay">
+  <div class="modal">
+    <h2><i class="ti ti-lock"></i> Játékmester belépés</h2>
+    <input type="password" id="gm-password-input" placeholder="Jelszó" autocomplete="off"/>
+    <div class="modal-error" id="login-error"></div>
+    <div class="modal-actions">
+      <button class="btn-modal" onclick="UI.gmLogin()">Belépés</button>
+      <button class="btn-modal secondary" onclick="UI.hideAll()">Mégse</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== GM PANEL ===== -->
+<div id="gm-panel" class="view overlay">
+  <div class="gm-wrap">
+    <div class="gm-header">
+      <h2><i class="ti ti-settings"></i> Játékmester</h2>
+      <button class="gm-close" onclick="UI.hideAll()"><i class="ti ti-x"></i></button>
+    </div>
+
+    <div class="gm-section">
+      <label class="section-label">Aktív kategória</label>
+      <div class="category-grid" id="category-grid"></div>
+    </div>
+
+    <div class="gm-section">
+      <label class="section-label">Időzítő (másodperc)</label>
+      <div class="timer-row">
+        <input type="range" id="timer-range" min="30" max="180" step="10" value="60" oninput="UI.updateTimerLabel()"/>
+        <span class="timer-val" id="timer-val">60</span>
+      </div>
+    </div>
+
+    <div class="gm-section">
+      <label class="section-label">Anthropic API kulcs</label>
+      <input type="password" id="api-key-input" placeholder="sk-ant-..."/>
+      <p class="section-hint">Az AI feladványgeneráláshoz szükséges. Nélküle előre beépített szókészlet működik.</p>
+    </div>
+
+    <div class="gm-section">
+      <label class="section-label">Jelszó módosítása</label>
+      <input type="password" id="new-pass-input" placeholder="Új jelszó"/>
+      <button class="btn-modal" style="margin-top:8px;" onclick="UI.changePassword()">Mentés</button>
+    </div>
+
+    <div class="gm-section">
+      <label class="section-label">Hangeffektek</label>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:14px;">Hangok bekapcsolva</span>
+        <label style="position:relative;display:inline-block;width:44px;height:24px;">
+          <input type="checkbox" id="sound-toggle" onchange="UI.toggleSound()" style="opacity:0;width:0;height:0;"/>
+          <span style="position:absolute;cursor:pointer;inset:0;background:#333;border-radius:24px;transition:.3s;"></span>
+        </label>
+      </div>
+      <div class="timer-row">
+        <span style="font-size:13px;color:#8888aa;min-width:60px;">Hangerő</span>
+        <input type="range" id="volume-range" min="0" max="100" step="5" value="70" oninput="UI.updateVolumeLabel()" style="flex:1;accent-color:#f5a623;"/>
+        <span class="timer-val" id="volume-val" style="font-size:18px;min-width:44px;">70%</span>
+      </div>
+    </div>
+
+    <div class="gm-section">
+      <label class="section-label">Session állapot</label>
+      <div id="session-counter" style="font-size:13px;color:#8888aa;margin-bottom:8px;">—</div>
+      <button class="btn-modal" style="background:rgba(232,64,64,0.15);color:#e84040;border:1px solid rgba(232,64,64,0.3);" onclick="UI.resetSession()">
+        <i class="ti ti-refresh"></i> Session reset (szólista törlése)
+      </button>
+    </div>
+
+    <div class="gm-actions">
+      <button class="btn-modal" onclick="UI.saveGMSettings()">
+        <i class="ti ti-device-floppy"></i> Beállítások mentése
+      </button>
+    </div>
+
+    <div class="gm-status" id="gm-status"></div>
+  </div>
+</div>
+
+<!-- Betöltő overlay -->
+<div id="loading-overlay" class="loading-overlay" style="display:none;">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">Feladványt generálok…</div>
+</div>
+
+<script>
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+</script>
+<script src="js/sounds.js"></script>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
